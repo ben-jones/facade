@@ -146,10 +146,11 @@ def encodeAsCookie(data):
   key = urlsafe_b64encode(key)
   key = key.replace('=', '+')
   value = urlsafe_b64encode(value)
-  cookie = 'Cookie: ' + key + '=' + value
+  # value = key.replace('=', '+')
+  cookie = key + '=' + value
   return cookie
 
-def decodeAsCookie(cookie):
+def decodeAsCookie(key, value):
   """
   Decode data from inside a cookie
 
@@ -165,11 +166,18 @@ def decodeAsCookie(cookie):
   to send data from the client to the server and modifications are
   necessary for convincing traffic from server to client
   """
-  pattern = 'Cookie: (?P<key>[a-zA-Z0-9+_\-/]+)=(?P<value>[a-zA-Z0-9+_=\-/]*)'
-  match = re.match(pattern, cookie)
-  key = match.group('key')
+  # pattern = 'Cookie: (?P<key>[a-zA-Z0-9+_\-/]+)=(?P<value>[a-zA-Z0-9+_=\-/]*)'
+  # match = re.match(pattern, cookie)
+  # print cookie
+  
+  # key = match.group('key')
+  # value = match.group('value')
+  # key = cookie.keys()[0]
+  # print key
+  # key= key[2:]
+  # print key
+  # value = cookie[key]
   key = key.replace('+', '=')
-  value = match.group('value')
   key = urlsafe_b64decode(key)
   value = urlsafe_b64decode(value)
   #In this case, the data needed padding because it was too
@@ -443,8 +451,8 @@ def decode(protocolUnit):
   elif isBaidu(url):
     data.append(decodeAsBaidu(url))
   else:
-    data.append(encodeAsB64(url))
+    data.append(decodeAsB64(url))
 #    raise UrlEncodeError("Data does not match a known decodable type")
-  for cookie in cookies:
-    data.append(decodeAsCookie(cookie))
+  for key in cookies.keys():
+    data.append(decodeAsCookie(str(key),str(cookies[key])))
   return ''.join(data)
