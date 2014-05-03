@@ -34,11 +34,16 @@ SERVER_SOCKS_PORT=9150 # communication b/w Tor and SOCKS client
 HTPT_CLIENT_SOCKS_PORT=8002   # communication b/w htpt and SOCKS
 #HTPT_SERVER_SOCKS_PORT=8003   # communication b/w htpt and SOCKS
 TIMEOUT = 0.5 #max number of seconds between calls to read from the server
-PAYLOAD_SIZE = 150
+PAYLOAD_SIZE = 180
 ENCODING_SCHEME = 'market'
+# ENCODING_SCHEME = 'b64'
+LOG_FILE = "log-file.txt"
 #Constants just to make this work-> remove
 #TODO
-TOR_BRIDGE_ADDRESS = "localhost:5000"
+# TOR_BRIDGE_ADDRESS = "localhost:5000"
+TOR_BRIDGE_IP = "localhost"
+TOR_BRIDGE_PORT = 11000
+TOR_BRIDGE_ADDRESS = TOR_BRIDGE_IP + ":" + str(TOR_BRIDGE_PORT)
 TOR_BRIDGE_PASSWORD = "hello"
 PASSWORDS = [TOR_BRIDGE_PASSWORD]
 
@@ -64,6 +69,9 @@ class HTPT():
       request = urllib2.Request(encoded['url'])
       for cookie in encoded['cookie']:
         request.add_header('Cookie:', cookie)
+      currentTime = datetime.now()
+      self.log.write("{} {}\n".format(PAYLOAD_SIZE, currentTime.strftime('%H-%M-%S-%f')))
+      self.log.flush()
       reader = urllib2.urlopen(request)
       readData = reader.read()
       # if we have received data from the Internet, then send it up to Tor
@@ -118,8 +126,10 @@ class HTPT():
     # self.torSock.send(data)
     return
 
-@app.route('/')
-def processRequest():
+# @app.route('/')
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def processRequest(path):
   """Process incoming requests from Apache
   
   Structure: this function determines whether data should go through
@@ -191,6 +201,7 @@ if __name__ == '__main__':
   htptObject = HTPT()
   urlEncode.domain = TOR_BRIDGE_ADDRESS
   if str(sys.argv[1]) == "-client":
+    htptObject.log = open(LOG_FILE, 'w')
     htptObject.run_client()
   else:
     addressList = []
@@ -206,4 +217,4 @@ if __name__ == '__main__':
     # htptObject.torSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # htptObject.torSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     # htptObject.torSock.connect(("localhost", SERVER_SOCKS_PORT))
-    app.run(debug=True, use_reloader=False)
+    app.run(host='localhost', port=11000, debug=True, use_reloader=False)

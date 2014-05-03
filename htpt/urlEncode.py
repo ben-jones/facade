@@ -7,7 +7,7 @@ import re
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 from random import choice, randint
 
-AVAILABLE_TYPES=['market', 'baidu', 'google']
+AVAILABLE_TYPES=['market', 'baidu', 'google', 'b64']
 BYTES_PER_COOKIE=30
 LOOKUP_TABLE = ['a', 'an', 'the', 'what', 'if', 'but', 'he', 'she',
                 'it', 'and', 'who', 'when', 'is', 'am', 'are', 'was']
@@ -53,6 +53,8 @@ def encode(data, encodingType):
     return encodeAsBaidu(data)
   elif encodingType == 'google':
     return encodeAsGoogle(data)
+  elif encodingType == 'b64':
+    return encodeAsB64(data)
 
 def encodeAsCookies(data):
   """Hide data inside a series of cookies"""
@@ -66,7 +68,8 @@ def encodeAsCookies(data):
       data = ''
   return cookies
 
-def encodeAsB64(host, data):
+# def encodeAsB64(host, data):
+def encodeAsB64(data):
   """
   Hide data inside the Host, path, and query string fields of the URL
 
@@ -83,7 +86,7 @@ def encodeAsB64(host, data):
 
   # base 64 encode the data
   encoded = urlsafe_b64encode(data)
-  encoded.replace("=", ".")
+  encoded.replace("=", "+")
 
   # divide it into path and query string
   split = randint(0, len(encoded)-1)
@@ -111,7 +114,7 @@ def encodeAsB64(host, data):
     var = equalPos + difference
     query = query[:equalPos] + "=" + query[equalPos:var] + ";" + query[var:]
 
-  url = "http://" + host + "/" + path + "?" + query
+  url = "http://" + domain + "/" + path + "?" + query
   encodedData = {'url':url, 'cookie':cookies}
   return encodedData
 
@@ -243,7 +246,8 @@ def encodeAsMarket(data):
   #values and we are using uppercase to distinguish padding and
   #actual text
 #  url = 'http://' + 'click.' + domain + '?qs=' + urlData
-  url = 'http://' + "localhost:5000/" + '?qs=' + urlData
+  # url = 'http://' + "localhost:5000/" + '?qs=' + urlData
+  url = 'http://' + domain + '?qs=' + urlData
   encodedData = {'url':url, 'cookie':cookies}
   return encodedData
 
@@ -417,8 +421,9 @@ def decodeWithB64(data):
   stuff added
 
   """
-  pattern = '/(?<path>[\S]+)\?(?<query>[\S]+)'
-  matches = re.search(pattern, url)
+  data.replace('+','=')
+  pattern = '/(?P<path>[\S]+)\?(?P<query>[\S]+)'
+  matches = re.search(pattern, data)
   path = matches.group('path')
   query = matches.group('query')
 
@@ -451,7 +456,7 @@ def decode(protocolUnit):
   elif isBaidu(url):
     data.append(decodeAsBaidu(url))
   else:
-    data.append(decodeAsB64(url))
+    data.append(decodeWithB64(str(url)))
 #    raise UrlEncodeError("Data does not match a known decodable type")
   for key in cookies.keys():
     data.append(decodeAsCookie(str(key),str(cookies[key])))
