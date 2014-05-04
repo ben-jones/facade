@@ -39,6 +39,7 @@ def encode(data, encodingType):
 
   """
 
+  print data[:4]
   if type(data) is list:
     data = ''.join(data)
   elif type(data) is not str:
@@ -79,6 +80,7 @@ def encodeAsB64(data):
 
   """
   # randomly take some data off of the end to be inserted into cookies
+  print len(data)
   cookieSplit = randint(0, len(data)/2)
   cookieData = data[cookieSplit:]
   cookies = encodeAsCookies(cookieData)
@@ -86,7 +88,7 @@ def encodeAsB64(data):
 
   # base 64 encode the data
   encoded = urlsafe_b64encode(data)
-  encoded.replace("=", "+")
+  encoded.replace("=", ".")
 
   # divide it into path and query string
   split = randint(0, len(encoded)-1)
@@ -97,22 +99,22 @@ def encodeAsB64(data):
   numSplits = randint(0, 15)
   if numSplits > len(data)/2:
     numSplits = len(data)/5
-  for loc in range(numSplits):
-    location = randint(1, len(path)-1)
-    path = path[:location] + "/" + path[:location]
-  # randomly insert ; and = into the query string
-  numSplits = randint(0, 15)
-  if numSplits > len(data)/2:
-    numSplits = len(data)/8
-  for cap in range(numSplits):
-    location = randint(0, (len(data)/numSplits))
-    if cap == numSplits - 1:
-      query = query[location:] + "=" + query[:location]
-      break
-    difference = randint(0, (len(data)/numSplits) -location)
-    equalPos = cap* len(data)/numSplits
-    var = equalPos + difference
-    query = query[:equalPos] + "=" + query[equalPos:var] + ";" + query[var:]
+  # for loc in range(numSplits):
+  #   location = randint(1, len(path)-1)
+  #   path = path[:location] + "/" + path[:location]
+  # # randomly insert ; and = into the query string
+  # numSplits = randint(0, 15)
+  # if numSplits > len(data)/2:
+  #   numSplits = len(data)/8
+  # for cap in range(numSplits):
+  #   location = randint(0, (len(data)/numSplits))
+  #   if cap == numSplits - 1:
+  #     query = query[location:] + "=" + query[:location]
+  #     break
+  #   difference = randint(0, (len(data)/numSplits) -location)
+  #   equalPos = cap* len(data)/numSplits
+  #   var = equalPos + difference
+  #   query = query[:equalPos] + "=" + query[equalPos:var] + ";" + query[var:]
 
   url = "http://" + domain + "/" + path + "?" + query
   encodedData = {'url':url, 'cookie':cookies}
@@ -147,11 +149,11 @@ def encodeAsCookie(data):
     value = data[keyLen:]
 
   key = urlsafe_b64encode(key)
-  key = key.replace('=', '+')
+  key = key.replace('=', '.')
   value = urlsafe_b64encode(value)
   # value = key.replace('=', '+')
-  cookie = key + '=' + value
-  return cookie
+  # cookie = key + '=' + value
+  return {'key':key, 'value':value}
 
 def decodeAsCookie(key, value):
   """
@@ -180,7 +182,7 @@ def decodeAsCookie(key, value):
   # key= key[2:]
   # print key
   # value = cookie[key]
-  key = key.replace('+', '=')
+  key = key.replace('.', '=')
   key = urlsafe_b64decode(key)
   value = urlsafe_b64decode(value)
   #In this case, the data needed padding because it was too
@@ -247,7 +249,7 @@ def encodeAsMarket(data):
   #actual text
 #  url = 'http://' + 'click.' + domain + '?qs=' + urlData
   # url = 'http://' + "localhost:5000/" + '?qs=' + urlData
-  url = 'http://' + domain + '?qs=' + urlData
+  url = 'http://' + domain + '/?qs=' + urlData
   encodedData = {'url':url, 'cookie':cookies}
   return encodedData
 
@@ -421,18 +423,17 @@ def decodeWithB64(data):
   stuff added
 
   """
-  data.replace('+','=')
+  data.replace("=", "")
+  data.replace(".", "=")
   pattern = '/(?P<path>[\S]+)\?(?P<query>[\S]+)'
   matches = re.search(pattern, data)
   path = matches.group('path')
   query = matches.group('query')
-
   # string out the encoding characters and decode the data
-  path.replace("/", "")
-  query.replace(";", "")
-  query.replace("=", "")
+  # path.replace("/", "")
+  # query.replace(";", "")
+  # query.replace("=", "")
   encoded = path + query
-  encoded.replace(".", "=")
   data = urlsafe_b64decode(encoded)
   return data
 
@@ -456,8 +457,11 @@ def decode(protocolUnit):
   elif isBaidu(url):
     data.append(decodeAsBaidu(url))
   else:
+    print url
+    print str(url)
     data.append(decodeWithB64(str(url)))
 #    raise UrlEncodeError("Data does not match a known decodable type")
+  print data[:4]
   for key in cookies.keys():
     data.append(decodeAsCookie(str(key),str(cookies[key])))
   return ''.join(data)

@@ -6,12 +6,19 @@
 
 # imports
 from datetime import datetime
+import os
+import os.path
 import random
 import select
 import socket
-import socks
+# import socks
+from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.ui import WebDriverWait # available since 2.4.0
+from selenium.webdriver.support import expected_conditions as EC
 import string
 import sys
+import time
 import urllib2
 
 #flask stuff
@@ -22,7 +29,7 @@ app = Flask(__name__)
 import frame
 import urlEncode
 import imageEncode
-from socks4a.htptProxy import ThreadingSocks4Proxy, ReceiveSocksReq, ForwardSocksReq
+# from socks4a.htptProxy import ThreadingSocks4Proxy, ReceiveSocksReq, ForwardSocksReq
 
 #from htpt import frame
 #from htpt import urlEncode
@@ -38,10 +45,13 @@ PAYLOAD_SIZE = 180
 ENCODING_SCHEME = 'market'
 # ENCODING_SCHEME = 'b64'
 LOG_FILE = "log-file.txt"
+IMAGE_FILE = "/home/ben/Downloads/hiccup-transfer-image.png"
 #Constants just to make this work-> remove
 #TODO
 # TOR_BRIDGE_ADDRESS = "localhost:5000"
 TOR_BRIDGE_IP = "localhost"
+# TOR_BRIDGE_IP = "130.207.97.233"
+# TOR_BRIDGE_IP = "ben.noise.gatech.edu"
 TOR_BRIDGE_PORT = 11000
 TOR_BRIDGE_ADDRESS = TOR_BRIDGE_IP + ":" + str(TOR_BRIDGE_PORT)
 TOR_BRIDGE_PASSWORD = "hello"
@@ -62,19 +72,42 @@ class HTPT():
     self.bridgeConnect(TOR_BRIDGE_ADDRESS, TOR_BRIDGE_PASSWORD)
     while 1:
       segment = ''.join([random.choice(string.digits) for i in range(PAYLOAD_SIZE)])
+      # segment = "hello"
       framed = self.assembler.assemble(segment)
       # encode the data
       encoded = urlEncode.encode(framed, ENCODING_SCHEME)
+      print encoded
       # send the data with headless web kit
-      request = urllib2.Request(encoded['url'])
+      # request = urllib2.Request(encoded['url'])
+      # self.driver = webdriver.Chrome()
+      self.driver.get(TOR_BRIDGE_ADDRESS + '/404')
       for cookie in encoded['cookie']:
-        request.add_header('Cookie:', cookie)
+        self.driver.add_cookie({'name':cookie['key'],'value':cookie['value']})#, 'path':'/', 'domain':TOR_BRIDGE_ADDRESS})
+        break
+        # cookieAdd = cookie['key'] + '='+ cookie['value']
+        # request.add_header('Cookie:', cookieAdd)
       currentTime = datetime.now()
       self.log.write("{} {}\n".format(PAYLOAD_SIZE, currentTime.strftime('%H-%M-%S-%f')))
       self.log.flush()
-      reader = urllib2.urlopen(request)
-      readData = reader.read()
+      print encoded['url']
+      try:
+        os.remove(IMAGE_FILE)
+      except OSError as e:
+        pass
+      self.driver.get(encoded['url'])
+      while not os.path.exists(IMAGE_FILE):
+        time.sleep(0.001)
+      # WebDriverWait(self.driver, 10).until(EC.visibility_of("img"))
+      fileP = open(IMAGE_FILE, 'r')
+      readData = fileP.read()
+      fileP.close()
+      # readData = self.driver.page_source
+      # reader = urllib2.urlopen(request)
+      # readData = reader.read()
       # if we have received data from the Internet, then send it up to Tor
+      self.driver.delete_all_cookies()
+      # self.driver.quit()
+      # self.driver.close()
       decoded = imageEncode.decode(readData, 'png')
       self.disassembler.disassemble(decoded)
 
@@ -99,11 +132,23 @@ class HTPT():
 
     data = self.assembler.assemble(password)
     encodedData = urlEncode.encodeAsMarket(data)
-    request = urllib2.Request(encodedData['url'])
-    for cookie in encodedData['cookie']:
-      request.add_header('Cookie:', cookie)
-    reader = urllib2.urlopen(request)
-    image = reader.read()
+    # request = urllib2.Request(encodedData['url'])
+    # for cookie in encodedData['cookie']:
+    #   request.add_header('Cookie:', cookie)
+    try:
+      os.remove(IMAGE_FILE)
+    except OSError as e:
+      pass
+    self.driver.get(encodedData['url'])
+    # WebDriverWait(self.driver, 10).until(EC.visibility_of("img"))
+    while not os.path.exists(IMAGE_FILE):
+      time.sleep(0.001)
+    fileP = open(IMAGE_FILE, 'r')
+    image = fileP.read()
+    fileP.close()
+    # image = self.driver.page_source
+    # reader = urllib2.urlopen(request)
+    # image = reader.read()
     # use the returned image to initialize the session ID
     decodedData = imageEncode.decode(image, 'png')
     self.disassembler.disassemble(decodedData)
@@ -122,9 +167,13 @@ class HTPT():
     Returns: nothing
 
     """
-#    print "htpt: {}".format(data)
+    print "htpt: {}".format(data)
     # self.torSock.send(data)
     return
+
+# @app.route('/404')
+# def returnPage():
+#   return 'Hello World!'
 
 # @app.route('/')
 @app.route('/', defaults={'path': ''})
@@ -137,6 +186,10 @@ def processRequest(path):
   gallery. This is a function due to constraints from flask
 
   """
+  print path
+  # if path == "http://" + TOR_BRIDGE_ADDRESS + "/404":
+  if path == "404" or not urlEncode.isMarket(request.url):
+    return "hello world!"
   # if we are not in the address list, then this is not an initialized connection
   if request.remote_addr not in addressList:
       # if the address is not in the list and it is not a market
@@ -181,27 +234,31 @@ def sendToImageGallery(request):
   image = imageEncode.encode('', 'png')
   response = make_response(image)
   response.headers['Content-Type'] = 'image/png'
-  response.headers['Content-Disposition'] = 'attachment; filename=img.png'
+  response.headers['Content-Disposition'] = 'attachment; filename=hiccup-transfer-image.png'
   return response
 
 def serveImage(image):
   response = make_response(image)
   response.headers['Content-Type'] = 'image/png'
-  response.headers['Content-Disposition'] = 'attachment; filename=img.png'
+  response.headers['Content-Disposition'] = 'attachment; filename=hiccup-transfer-image.png'
   return response
 
 def callback(data):
   if data == '':
     return
-#  else:
-#    print "Received: {}".format(data)
-  htptObject.recvData(data)
+  else:
+   print "Received: {}".format(data)
+   htptObject.recvData(data)
   
 if __name__ == '__main__':
   htptObject = HTPT()
   urlEncode.domain = TOR_BRIDGE_ADDRESS
   if str(sys.argv[1]) == "-client":
     htptObject.log = open(LOG_FILE, 'w')
+    htptObject.driver = webdriver.Chrome()
+    # htptObject.driver = webdriver.Firefox()
+#     htptObject.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.Des
+# iredCapabilities.HTMLUNIT.copy())
     htptObject.run_client()
   else:
     addressList = []
@@ -217,4 +274,4 @@ if __name__ == '__main__':
     # htptObject.torSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # htptObject.torSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     # htptObject.torSock.connect(("localhost", SERVER_SOCKS_PORT))
-    app.run(host='localhost', port=11000, debug=True, use_reloader=False)
+    app.run(host=TOR_BRIDGE_IP, port=TOR_BRIDGE_PORT, debug=True, use_reloader=False)
