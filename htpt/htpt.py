@@ -3,6 +3,7 @@
 # Fall 2013
 # Georgia Tech
 # htpt.py: this file contains the code to run the HTPT transport
+# Dependencies: please run sudo easy_install selenium and sudo easy_install pysocks
 
 # imports
 from datetime import datetime
@@ -76,10 +77,9 @@ class HTPT():
       framed = self.assembler.assemble(segment)
       # encode the data
       encoded = urlEncode.encode(framed, ENCODING_SCHEME)
-      print encoded
+      # print encoded
       # send the data with headless web kit
       # request = urllib2.Request(encoded['url'])
-      # self.driver = webdriver.Chrome()
       self.driver.get(TOR_BRIDGE_ADDRESS + '/404')
       for cookie in encoded['cookie']:
         self.driver.add_cookie({'name':cookie['key'],'value':cookie['value']})#, 'path':'/', 'domain':TOR_BRIDGE_ADDRESS})
@@ -89,7 +89,7 @@ class HTPT():
       currentTime = datetime.now()
       self.log.write("{} {}\n".format(PAYLOAD_SIZE, currentTime.strftime('%H-%M-%S-%f')))
       self.log.flush()
-      print encoded['url']
+      # print encoded['url']
       try:
         os.remove(IMAGE_FILE)
       except OSError as e:
@@ -98,6 +98,7 @@ class HTPT():
       while not os.path.exists(IMAGE_FILE):
         time.sleep(0.001)
       # WebDriverWait(self.driver, 10).until(EC.visibility_of("img"))
+      time.sleep(0.001)
       fileP = open(IMAGE_FILE, 'r')
       readData = fileP.read()
       fileP.close()
@@ -186,9 +187,10 @@ def processRequest(path):
   gallery. This is a function due to constraints from flask
 
   """
-  print path
+  # print path
   # if path == "http://" + TOR_BRIDGE_ADDRESS + "/404":
-  if path == "404" or not urlEncode.isMarket(request.url):
+  # if path == "404" or not urlEncode.isMarket(request.url):
+  if path == "404" or path == 'favicon.ico':
     return "hello world!"
   # if we are not in the address list, then this is not an initialized connection
   if request.remote_addr not in addressList:
