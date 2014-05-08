@@ -111,6 +111,7 @@ class HTPT():
       # self.driver.close()
       decoded = imageEncode.decode(readData, 'png')
       self.disassembler.disassemble(decoded)
+      time.sleep(TIMEOUT)
 
   def bridgeConnect(self, address, password):
     """
