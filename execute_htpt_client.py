@@ -96,7 +96,7 @@ def main():
 
             filename = str(NET_DEL)+'_'+str(REQ_DEL)+'.log'
 
-            server.remoteCommand('kill -9 $(pgrep htpt); ./htpt/htpt.py -server > /home/gtnoise/Documents/server_'+filename)
+            server.remoteCommand('kill -9 $(pgrep htpt); ./htpt/htpt/htpt.py -server > /home/gtnoise/Documents/server_'+filename)
 
             time.sleep(1)
 
@@ -109,7 +109,7 @@ def main():
             #time.sleep(timeout)
             print "DONE"
 
-            run('cp /home/gtnoise/log-file.txt /home/gtnoise/Documents/htpt/tp_'+filename)
+            run('cp /home/gtnoise/htpt/log-file.txt /home/gtnoise/Documents/htpt/tp_'+filename)
             server.remoteCommand('kill -9 $(pgrep htpt)')
             #server.remoteCommand('echo "gtnoise" | sudo -S killall tcpdump')
             #Command('echo "gtnoise" | sudo -S killall tcpdump').run(1)
