@@ -43,7 +43,9 @@ HTPT_CLIENT_SOCKS_PORT=8002   # communication b/w htpt and SOCKS
 #HTPT_SERVER_SOCKS_PORT=8003   # communication b/w htpt and SOCKS
 TIMEOUT = 0.5 #max number of seconds between calls to read from the server
 PAYLOAD_SIZE = 180
-ENCODING_SCHEME = 'market'
+# ENCODING_SCHEME = 'market'
+ENCODING_SCHEME = 'search'
+# ENCODING_SCHEME = 'baidu'
 # ENCODING_SCHEME = 'b64'
 LOG_FILE = "log-file.txt"
 IMAGE_FILE = "/home/ben/Downloads/hiccup-transfer-image.png"
@@ -94,6 +96,7 @@ class HTPT():
         os.remove(IMAGE_FILE)
       except OSError as e:
         pass
+      print "numCookies: {} length: {}".format(len(encoded['cookie']),len(encoded['url']))
       self.driver.get(encoded['url'])
       while not os.path.exists(IMAGE_FILE):
         time.sleep(0.001)
