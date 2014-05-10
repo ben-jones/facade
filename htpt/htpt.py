@@ -259,6 +259,7 @@ def callback(data):
 if __name__ == '__main__':
   htptObject = HTPT()
   urlEncode.domain = TOR_BRIDGE_ADDRESS
+
   if str(sys.argv[1]) == "-client":
     htptObject.log = open(LOG_FILE, 'w')
     htptObject.driver = webdriver.Chrome()

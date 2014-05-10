@@ -18,6 +18,7 @@ REVERSE_LOOKUP_TABLE = {'a':'0', 'an':'1', 'ha':'2', 'hi':'3',
                         'is':'C', 'am':'D', 'DA':'E', 'EE':'F'}
 DICT_FILE = "dictionary.txt"
 
+
 class UrlEncodeError(Exception):
   pass
 
@@ -415,34 +416,32 @@ def decodeAsEnglish(words):
 
 def encodeWithDict(data):
   """Convert two byte chunks to english text"""
-
-  fileP = open(DICT_FILE, 'r')
-  lines = fileP.readlines()
-  fileP.close()
-  words =[]
+  # if LOOKUP_TABLE_IMPORTED == False:
+  #   importLookupTable(DICT_FILE)
+  #   importReverseLookupTable(DICT_FILE)
+  #   LOOKUP_TABLE_IMPORTED = True
   data = list(data)
   # if there are an odd number of elements, add -1 onto the end
   if len(data) %2 != 0:
     data.append(chr(255))
+  words = []
   for chunkIndex in range(0,len(data), 2):
     chunk = data[chunkIndex:chunkIndex+2]
     index = (ord(chunk[1]) << 8) | ord(chunk[0])
-    words.append(lines[index].strip())
+    words.append(LOOKUP_TABLE[index])
   return words
 
 def decodeWithDict(words):
   """Convert english text to two byte chunks"""
-
-  fileP = open(DICT_FILE, 'r')
-  lines =fileP.readlines()
-  fileP.close()
+  # if LOOKUP_TABLE_IMPORTED == False:
+  #   importLookupTable(DICT_FILE)
+  #   importReverseLookupTable(DICT_FILE)
+  #   LOOKUP_TABLE_IMPORTED = True
   decoded =[]
   for word in words:
-    for lineNum in range(len(lines)):
-      line = lines[lineNum]
-      if line.strip() == str(word):
-        decoded.append(chr(lineNum & 255))
-        decoded.append(chr((lineNum & (255 <<8)) >> 8))
+    lineNum = REVERSE_LOOKUP_TABLE[word]
+    decoded.append(chr(lineNum & 255))
+    decoded.append(chr((lineNum & (255 <<8)) >> 8))
   if decoded[-1] == chr(255):
     del decoded[-1]
   return decoded
@@ -553,7 +552,7 @@ def convertCookieInputToOutput(cookies):
 
 def importLookupTable(filename):
   fileP = open(filename, 'r')
-  lines = fileP.lines()
+  lines = fileP.readlines()
   for index in range(len(lines)):
     lines[index] = lines[index].strip()
   LOOKUP_TABLE = lines
@@ -561,7 +560,7 @@ def importLookupTable(filename):
 
 def importReverseLookupTable(filename):
   fileP = open(filename, 'r')
-  lines = fileP.lines()
+  lines = fileP.readlines()
   table = {}
   for index in range(len(lines)):
     line = lines[index].strip()
@@ -601,3 +600,6 @@ def decode(protocolUnit):
     data.append(decodeAsCookie(str(key),str(cookies[key])))
   return ''.join(data)
   # return data
+
+LOOKUP_TABLE = importLookupTable(DICT_FILE)
+REVERSE_LOOKUP_TABLE = importReverseLookupTable(DICT_FILE)
