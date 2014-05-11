@@ -21,6 +21,7 @@ import string
 import sys
 import time
 import urllib2
+import const
 
 #flask stuff
 from flask import Flask, request, make_response
@@ -41,19 +42,22 @@ CLIENT_SOCKS_PORT=8000 # communication b/w Tor and SOCKS server
 SERVER_SOCKS_PORT=9150 # communication b/w Tor and SOCKS client
 HTPT_CLIENT_SOCKS_PORT=8002   # communication b/w htpt and SOCKS
 #HTPT_SERVER_SOCKS_PORT=8003   # communication b/w htpt and SOCKS
-TIMEOUT = 0.5 #max number of seconds between calls to read from the server
-PAYLOAD_SIZE = 180
+TIMEOUT = const.TIMEOUT #max number of seconds between calls to read from the server
+COUNTER_THRESHOLD = 200
+
+PAYLOAD_SIZE = const.SIZE
 # ENCODING_SCHEME = 'market'
 ENCODING_SCHEME = 'search'
 # ENCODING_SCHEME = 'baidu'
 # ENCODING_SCHEME = 'b64'
 LOG_FILE = "log-file.txt"
-IMAGE_FILE = "/home/ben/Downloads/hiccup-transfer-image.png"
+IMAGE_FILE = "/home/gtnoise/Downloads/hiccup-transfer-image.png"
 #Constants just to make this work-> remove
 #TODO
 # TOR_BRIDGE_ADDRESS = "localhost:5000"
-TOR_BRIDGE_IP = "localhost"
-# TOR_BRIDGE_IP = "130.207.97.233"
+# TOR_BRIDGE_IP = "localhost"
+# TOR_BRIDGE_IP = "130.207.97.74"
+TOR_BRIDGE_IP = "192.168.20.1"
 # TOR_BRIDGE_IP = "ben.noise.gatech.edu"
 TOR_BRIDGE_PORT = 11000
 TOR_BRIDGE_ADDRESS = TOR_BRIDGE_IP + ":" + str(TOR_BRIDGE_PORT)
@@ -73,6 +77,7 @@ class HTPT():
     self.assembler = frame.Assembler()
     # bind to a local address and wait for Tor to connect
     self.bridgeConnect(TOR_BRIDGE_ADDRESS, TOR_BRIDGE_PASSWORD)
+    send_counter = 0
     while 1:
       segment = ''.join([random.choice(string.digits) for i in range(PAYLOAD_SIZE)])
       # segment = "hello"
@@ -82,7 +87,7 @@ class HTPT():
       # print encoded
       # send the data with headless web kit
       # request = urllib2.Request(encoded['url'])
-      self.driver.get(TOR_BRIDGE_ADDRESS + '/404')
+      self.driver.get('http://' + TOR_BRIDGE_ADDRESS + '/404')
       for cookie in encoded['cookie']:
         self.driver.add_cookie({'name':cookie['key'],'value':cookie['value']})#, 'path':'/', 'domain':TOR_BRIDGE_ADDRESS})
         break
@@ -116,6 +121,10 @@ class HTPT():
       self.disassembler.disassemble(decoded)
       time.sleep(TIMEOUT)
 
+      send_counter += 1
+      if send_counter > COUNTER_THRESHOLD:
+        break;
+
   def bridgeConnect(self, address, password):
     """
     Create a connection to a bridge from a client
@@ -123,7 +132,7 @@ class HTPT():
     Parameters:
     address- the ip address to connect to
     password- the password to send in the payload of the packet
-  
+
     Notes: this function will send a packet to the server via market
     encoding with the password hidden in the payload
 
@@ -162,10 +171,10 @@ class HTPT():
   def recvData(self, data):
     """
     Callback function for the dissassemblers
-    
+
     Parameters:
     data- the string of received data to be passed up to Tor
-    
+
     Notes: this functions is used by both the client and server to
     pass data up to Tor
 
@@ -185,7 +194,7 @@ class HTPT():
 @app.route('/<path:path>')
 def processRequest(path):
   """Process incoming requests from Apache
-  
+
   Structure: this function determines whether data should go through
   to htpt decoding or if it should be passed to the image
   gallery. This is a function due to constraints from flask
@@ -255,7 +264,7 @@ def callback(data):
   else:
    print "Received: {}".format(data)
    htptObject.recvData(data)
-  
+
 if __name__ == '__main__':
   htptObject = HTPT()
   urlEncode.domain = TOR_BRIDGE_ADDRESS
@@ -267,6 +276,7 @@ if __name__ == '__main__':
 #     htptObject.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.Des
 # iredCapabilities.HTMLUNIT.copy())
     htptObject.run_client()
+    htptObject.driver.close()
   else:
     addressList = []
     # setup the proxy server
