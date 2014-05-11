@@ -76,9 +76,10 @@ def set_network_delay(router, NET_DEL):
         router.remoteCommand('tc qdisc add dev eth1 root netem delay '+delay+'ms; tc qdisc add dev eth0 root netem delay '+delay+'ms;')
     return
 
-def set_request_delay(REQ_DEL):
+def set_const(REQ_DEL, SIZE):
     delay = str(REQ_DEL/1000.0)
-    open('htpt/const.py', 'w').write('TIMEOUT='+delay)
+    psize = str(SIZE)
+    open('htpt/const.py', 'w').write('TIMEOUT='+delay+'\nSIZE='+psize)
     return
 
 def main():
@@ -87,35 +88,24 @@ def main():
     router = Router('192.168.1.1', 'root', 'passw0rd')
     server = Router('192.168.20.1', 'gtnoise', 'gtnoise')
 
-    for NET_DEL in [1,10,20,30,40,50,100,200,500,1000]: #150,200,300,400,500,1000]
-    #for NET_DEL in [150,200,300,400,500,1000]:
+    for NET_DEL in [1,10,20,30,40,50,100,500]: #150,200,300,400,500,1000]
         set_network_delay(router, NET_DEL)
+        for REQ_DEL in [0,1,10,50,100,500,1000]:
+            for SIZE in [100, 200, 500, 1000, 1400, 2000]:
+                set_const(REQ_DEL, SIZE)
 
-        for REQ_DEL in [0,1,5,10,20,50,100,200,500,1000]:
-            set_request_delay(REQ_DEL)
+                filename = str(NET_DEL)+'_'+str(REQ_DEL)+'_'+str(SIZE)+'.log'
 
-            filename = str(NET_DEL)+'_'+str(REQ_DEL)+'.log'
+                server.remoteCommand('kill -9 $(pgrep htpt); ./htpt/htpt/htpt.py -server > /home/gtnoise/Documents/server_'+filename)
 
-            server.remoteCommand('kill -9 $(pgrep htpt); ./htpt/htpt/htpt.py -server > /home/gtnoise/Documents/server_'+filename)
+                time.sleep(1)
 
-            time.sleep(1)
+                print "START 200; NET_DEL: "+str(NET_DEL)+"ms; REQ_DEL:"+str(REQ_DEL)+"ms; SIZE:"+str(SIZE)+" bytes"
+                run('./htpt/htpt.py -client', open('/home/gtnoise/Documents/search/client_'+filename, 'w'))
+                print "DONE"
 
-            #server.remoteCommand('echo "gtnoise" | sudo -S tcpdump -i eth1 -s 0 -w /home/gtnoise/Documents/server_'+NET_DEL+'_'+REQ_DEL+'.pcap &')
-            #Command('echo "gtnoise" | sudo -S tcpdump -i eth0 -s 0 -w /home/gtnoise/Documents/client_'+NET_DEL+'_'+REQ_DEL+'.pcap').run(1)
-
-            print "START 200; NET_DEL: "+str(NET_DEL)+"ms; REQ_DEL:"+str(REQ_DEL)+"ms"
-            run('./htpt/htpt.py -client', open('/home/gtnoise/Documents/client_'+filename, 'w'))
-
-            #time.sleep(timeout)
-            print "DONE"
-
-            run('cp /home/gtnoise/htpt/log-file.txt /home/gtnoise/Documents/htpt/tp_'+filename)
-            server.remoteCommand('kill -9 $(pgrep htpt)')
-            #server.remoteCommand('echo "gtnoise" | sudo -S killall tcpdump')
-            #Command('echo "gtnoise" | sudo -S killall tcpdump').run(1)
-            #subprocess.check_output('kill -9 $(pgrep htpt)', shell=True)
-            #subprocess.check_output('mv htpt/log-file.txt /home/gtnoise/Documents/client_'+NET_DEL+'_'+REQ_DEL+'.log', shell=True)
-
+                run('cp /home/gtnoise/htpt/log-file.txt /home/gtnoise/Documents/search/tp_'+filename)
+                server.remoteCommand('kill -9 $(pgrep htpt)')
 
     router.host.close()
     server.host.close()

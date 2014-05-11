@@ -45,7 +45,7 @@ HTPT_CLIENT_SOCKS_PORT=8002   # communication b/w htpt and SOCKS
 TIMEOUT = const.TIMEOUT #max number of seconds between calls to read from the server
 COUNTER_THRESHOLD = 200
 
-PAYLOAD_SIZE = 180
+PAYLOAD_SIZE = const.SIZE
 # ENCODING_SCHEME = 'market'
 ENCODING_SCHEME = 'search'
 # ENCODING_SCHEME = 'baidu'
