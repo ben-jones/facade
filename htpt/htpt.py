@@ -46,7 +46,9 @@ TIMEOUT = const.TIMEOUT #max number of seconds between calls to read from the se
 COUNTER_THRESHOLD = 200
 
 PAYLOAD_SIZE = 180
-ENCODING_SCHEME = 'market'
+# ENCODING_SCHEME = 'market'
+ENCODING_SCHEME = 'search'
+# ENCODING_SCHEME = 'baidu'
 # ENCODING_SCHEME = 'b64'
 LOG_FILE = "log-file.txt"
 IMAGE_FILE = "/home/gtnoise/Downloads/hiccup-transfer-image.png"
@@ -99,6 +101,7 @@ class HTPT():
         os.remove(IMAGE_FILE)
       except OSError as e:
         pass
+      print "numCookies: {} length: {}".format(len(encoded['cookie']),len(encoded['url']))
       self.driver.get(encoded['url'])
       while not os.path.exists(IMAGE_FILE):
         time.sleep(0.001)
@@ -265,6 +268,7 @@ def callback(data):
 if __name__ == '__main__':
   htptObject = HTPT()
   urlEncode.domain = TOR_BRIDGE_ADDRESS
+
   if str(sys.argv[1]) == "-client":
     htptObject.log = open(LOG_FILE, 'w')
     htptObject.driver = webdriver.Chrome()

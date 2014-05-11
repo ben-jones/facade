@@ -7,14 +7,17 @@ import re
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 from random import choice, randint
 
-AVAILABLE_TYPES=['market', 'baidu', 'google', 'b64']
+AVAILABLE_TYPES=['market', 'baidu', 'google', 'b64', 'search']
 BYTES_PER_COOKIE=30
-LOOKUP_TABLE = ['a', 'an', 'the', 'what', 'if', 'but', 'he', 'she',
-                'it', 'and', 'who', 'when', 'is', 'am', 'are', 'was']
-REVERSE_LOOKUP_TABLE = {'a':'0', 'an':'1', 'the':'2', 'what':'3',
-                        'if':'4', 'but':'5', 'he':'6', 'she':'7',
-                        'it':'8', 'and':'9', 'who':'A', 'when':'B',
-                        'is':'C', 'am':'D', 'are':'E', 'was':'F'}
+LOOKUP_TABLE_IMPORTED = False
+LOOKUP_TABLE = ['a', 'an', 'ha', 'hi', 'if', 'ai', 'he', 'BB',
+                'it', 'cd', 'co', 'as', 'is', 'am', 'DA', 'EE']
+REVERSE_LOOKUP_TABLE = {'a':'0', 'an':'1', 'ha':'2', 'hi':'3',
+                        'if':'4', 'ai':'5', 'he':'6', 'BB':'7',
+                        'it':'8', 'cd':'9', 'co':'A', 'as':'B',
+                        'is':'C', 'am':'D', 'DA':'E', 'EE':'F'}
+DICT_FILE = "dictionary.txt"
+
 
 class UrlEncodeError(Exception):
   pass
@@ -50,6 +53,8 @@ def encode(data, encodingType):
                            "url-encode.AVAILABLE_TYPES for available options"))
   if encodingType == 'market':
     return encodeAsMarket(data)
+  elif encodingType == 'search':
+    return encodeAsOpenSearch(data)
   elif encodingType == 'baidu':
     return encodeAsBaidu(data)
   elif encodingType == 'google':
@@ -88,7 +93,7 @@ def encodeAsB64(data):
 
   # base 64 encode the data
   encoded = urlsafe_b64encode(data)
-  encoded.replace("=", ".")
+  # encoded.replace("=", ".")
 
   # divide it into path and query string
   split = randint(0, len(encoded)-1)
@@ -280,15 +285,17 @@ def encodeAsBaidu(data):
   """
   urlData = data
   cookies = []
-  if len(data) > 40:
-    urlData = data[:40]
-    cookies = encodeAsCookies(data[40:])
-  words = encodeAsEnglish(urlData)
+  # if len(data) > 40:
+  #   urlData = data[:40]
+  #   cookies = encodeAsCookies(data[40:])
+  # words = encodeAsEnglish(urlData)
+  words = encodeWithDict(urlData)
   urlData = '+'.join(words)
   #Note: we cannot use urlparse here because it capitalizes our hex
   #values and we are using uppercase to distinguish padding and
   #actual text
-  url = 'http://www.baidu.com/s?wd=' + urlData
+  # url = 'http://www.baidu.com/s?wd=' + urlData
+  url = 'http://' +domain + '/s?wd=' + urlData
   encodedData = {'url':url, 'cookie':cookies}
   return encodedData
 
@@ -311,12 +318,20 @@ def decodeAsBaidu(url):
   Returns: a string with the decoded data
 
   """
-  pattern = 'http://www.baidu.com/s\?wd=(?P<englishText>[a-zA-Z0-9+]+)'
+  # pattern = 'http://www.baidu.com/s\?wd=(?P<englishText>[a-zA-Z0-9+]+)'
+  pattern = 'http://'+ domain + '/s\?wd=(?P<englishText>[\S]+)'
   matches = re.match(pattern, url)
   urlData = matches.group('englishText')
+  # print url
+  # print urlData
   words = urlData.split('+')
-  data = decodeAsEnglish(words)
-  return data
+  # data = decodeAsEnglish(words)
+  data = decodeWithDict(words)
+  # return data
+  return ''.join(data)
+
+
+
 
 def isGoogle(url):
   """
@@ -399,6 +414,38 @@ def decodeAsEnglish(words):
   data = binascii.unhexlify(hexString)
   return data
 
+def encodeWithDict(data):
+  """Convert two byte chunks to english text"""
+  # if LOOKUP_TABLE_IMPORTED == False:
+  #   importLookupTable(DICT_FILE)
+  #   importReverseLookupTable(DICT_FILE)
+  #   LOOKUP_TABLE_IMPORTED = True
+  data = list(data)
+  # if there are an odd number of elements, add -1 onto the end
+  if len(data) %2 != 0:
+    data.append(chr(255))
+  words = []
+  for chunkIndex in range(0,len(data), 2):
+    chunk = data[chunkIndex:chunkIndex+2]
+    index = (ord(chunk[1]) << 8) | ord(chunk[0])
+    words.append(LOOKUP_TABLE[index])
+  return words
+
+def decodeWithDict(words):
+  """Convert english text to two byte chunks"""
+  # if LOOKUP_TABLE_IMPORTED == False:
+  #   importLookupTable(DICT_FILE)
+  #   importReverseLookupTable(DICT_FILE)
+  #   LOOKUP_TABLE_IMPORTED = True
+  decoded =[]
+  for word in words:
+    lineNum = REVERSE_LOOKUP_TABLE[word]
+    decoded.append(chr(lineNum & 255))
+    decoded.append(chr((lineNum & (255 <<8)) >> 8))
+  if decoded[-1] == chr(255):
+    del decoded[-1]
+  return decoded
+
 def decodeAsMarket(url):
   """
   Decode data hidden inside a url format for email personalization
@@ -417,25 +464,109 @@ def decodeAsMarket(url):
   data = binascii.unhexlify(data)
   return data
 
-def decodeWithB64(data):
+def decodeWithB64(url, cookies):
   """
   Decode the given data as b64 encoded with path and query string
   stuff added
 
   """
-  data.replace("=", "")
-  data.replace(".", "=")
-  pattern = '/(?P<path>[\S]+)\?(?P<query>[\S]+)'
-  matches = re.search(pattern, data)
+  url.replace("=", "")
+  url.replace(".", "=")
+  pattern = 'http://[\S]+/(?P<path>[\S]+)\?(?P<query>[\S]+)'
+  matches = re.search(pattern, url)
   path = matches.group('path')
   query = matches.group('query')
   # string out the encoding characters and decode the data
   # path.replace("/", "")
   # query.replace(";", "")
   # query.replace("=", "")
-  encoded = path + query
-  data = urlsafe_b64decode(encoded)
+  encoded = []
+  for key in cookies.keys():
+    value = cookies[key]
+    key.replace('.', '=')
+    value.replace('.', '=')
+    encoded.append(key)
+    encoded.append(value)
+  encoded = str(''.join(encoded))
+  urlPortion = str(path + query)
+  data = urlsafe_b64decode(urlPortion) + urlsafe_b64decode(encoded)
   return data
+
+def encodeAsOpenSearch(data):
+  """
+  Hide data inside URLs using open search specification
+
+  Parameters:
+  data- the data to encode
+
+  Returns: a dictionary with the key 'url' referencing a string
+  holding the url and the key 'cookie' holding a dictionary of cookies
+
+  Example: http://www.baidu.com/s?wd=mao+is+cool&rsv_bp=0&ch=&tn=baidu&bar=&rsv_spt=3&ie=utf-8
+
+  """
+  urlData = data
+  cookies = []
+  words = encodeWithDict(urlData)
+  urlData = '+'.join(words)
+  #Note: we cannot use urlparse here because it capitalizes our hex
+  #values and we are using uppercase to distinguish padding and
+  #actual text
+  # url = 'http://www.baidu.com/s?wd=' + urlData
+  url = 'http://' +domain + '/s?wd=' + urlData
+  encodedData = {'url':url, 'cookie':cookies}
+  return encodedData
+
+def isOpenSearch(url):
+  """Return True if this url matches the pattern for Baidu searches"""
+
+  #Example: http://www.baidu.com/s?wd=mao+is+cool&rsv_bp=0&ch=&tn=baidu&bar=&rsv_spt=3&ie=utf-8
+  pattern = 'http://' + domain + '/s\?wd=[A-Za-z0-9\'+]+'
+  matches = re.match(pattern, url)
+  if matches != None:
+      return True
+  return False
+
+def decodeAsOpenSearch(url):
+  """
+  Decode data hidden inside a url format for searches
+
+  Parameters: url- the url to decode
+
+  Returns: a string with the decoded data
+
+  """
+  # pattern = 'http://www.baidu.com/s\?wd=(?P<englishText>[a-zA-Z0-9+]+)'
+  pattern = 'http://'+ domain + '/s\?wd=(?P<englishText>[\S]+)'
+  matches = re.match(pattern, url)
+  urlData = matches.group('englishText')
+  words = urlData.split('+')
+  data = decodeWithDict(words)
+  return ''.join(data)
+
+def convertCookieInputToOutput(cookies):
+  output = {}
+  for entry in cookies:
+    output[entry['key']] = entry['value']
+  return output
+
+def importLookupTable(filename):
+  fileP = open(filename, 'r')
+  lines = fileP.readlines()
+  for index in range(len(lines)):
+    lines[index] = lines[index].strip()
+  LOOKUP_TABLE = lines
+  return lines
+
+def importReverseLookupTable(filename):
+  fileP = open(filename, 'r')
+  lines = fileP.readlines()
+  table = {}
+  for index in range(len(lines)):
+    line = lines[index].strip()
+    table[line] = index
+  REVERSE_LOOKUP_TABLE = table
+  return table
 
 def decode(protocolUnit):
 
@@ -454,14 +585,21 @@ def decode(protocolUnit):
   data = []
   if isMarket(url):
     data.append(decodeAsMarket(url))
-  elif isBaidu(url):
-    data.append(decodeAsBaidu(url))
+  elif isOpenSearch(url):
+    data.append(decodeAsOpenSearch(url))
+  # elif isBaidu(url):
+  #   data.append(decodeAsBaidu(url))
   else:
-    print url
-    print str(url)
-    data.append(decodeWithB64(str(url)))
-#    raise UrlEncodeError("Data does not match a known decodable type")
+  #   data.append(decodeAsBaidu(url))
+# FIX
+    # return decodeWithB64(str(url), cookies)
+    raise UrlEncodeError("Data does not match a known decodable type")
+  # print data
   print data[:4]
   for key in cookies.keys():
     data.append(decodeAsCookie(str(key),str(cookies[key])))
   return ''.join(data)
+  # return data
+
+LOOKUP_TABLE = importLookupTable(DICT_FILE)
+REVERSE_LOOKUP_TABLE = importReverseLookupTable(DICT_FILE)

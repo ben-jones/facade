@@ -13,6 +13,9 @@ from htpt import urlEncode
 class TestUrlEncode(unittest.TestCase):
   """Class with methods to test the functions in urlEncode"""
 
+  def setUp(self):
+    urlEncode.domain = 'localhost:11000'
+
   def test_encode(self):
     """Verify that the encode method works correctly"""
     testData = ['this is a test', 'some text'
@@ -20,9 +23,11 @@ class TestUrlEncode(unittest.TestCase):
                 'which should be longer than a normal url']
     for datum in testData:
       testOutput = urlEncode.encode(datum, 'market')
+      testOutput['cookie'] = urlEncode.convertCookieInputToOutput(testOutput['cookie'])
       testDecode = urlEncode.decode(testOutput)
       self.assertEqual(datum, testDecode)
       testOutput = urlEncode.encode(datum, 'baidu')
+      testOutput['cookie'] = urlEncode.convertCookieInputToOutput(testOutput['cookie'])
       testDecode = urlEncode.decode(testOutput)
       self.assertEqual(datum, testDecode)
 
@@ -45,8 +50,9 @@ class TestUrlEncode(unittest.TestCase):
     for datum in testData:
       testOutput = urlEncode.encodeAsCookies(datum)
       data = []
-      for cookie in testOutput:
-        data.append(urlEncode.decodeAsCookie(cookie))
+      testOutput = urlEncode.convertCookieInputToOutput(testOutput)
+      for key in testOutput.keys():
+        data.append(urlEncode.decodeAsCookie(str(key), str(testOutput[key])))
       data = ''.join(data)
       self.assertEqual(data, datum)
 
@@ -123,7 +129,7 @@ class TestUrlEncode(unittest.TestCase):
         output = urlEncode.encodeAsMarket(datum)
         testOutput = output['url']
         #verify that the output is in the correct form
-        pattern = 'http://[a-zA-Z0-9.]*[.]com\?qs=(?P<hash>[0-9a-fA-F]*)'
+        pattern = 'http://[a-zA-Z0-9.:]+/\?qs=(?P<hash>[0-9a-fA-F]*)'
         matches = re.match(pattern, testOutput)
         self.assertNotEqual(matches, None)
         #verify that the output is actually the hex representation of
@@ -136,8 +142,9 @@ class TestUrlEncode(unittest.TestCase):
         dataLen = int(hashPart[:2], 16)
         testDatum = hashPart[2:dataLen+2]
         testDatum = binascii.unhexlify(testDatum)
-        for cookie in output['cookie']:
-          testDatum += urlEncode.decodeAsCookie(cookie)
+        cookies = urlEncode.convertCookieInputToOutput(output['cookie'])
+        for key in cookies.keys():
+          testDatum += urlEncode.decodeAsCookie(str(key), str(cookies[key]))
         self.assertEqual(testDatum, datum)
 
   def test_isMarket(self):
@@ -192,69 +199,69 @@ class TestUrlEncode(unittest.TestCase):
       stringy.append(choice(characters))
     return ''.join(stringy)
 
-  def test_isBaidu(self):
-    """verify that we can detect urls of the form
-    http://www.baidu.com/s?wd=text+other"""
+  # def test_isBaidu(self):
+  #   """verify that we can detect urls of the form
+  #   http://www.baidu.com/s?wd=text+other"""
 
-    trueUrls = ['http://www.baidu.com/s?wd=mao+is+cool&rsv_bp='
-            '0&ch=&tn=baidu&bar=&rsv_spt=3&ie=utf-8',
-            'http://www.baidu.com/s?wd=freedom+is+nice'
-            '&rsv_bp=0&rsv_spt=3&ie=utf-8']
-    falseUrls = ['http://www.google.com', 'stirngy']
-    for url in trueUrls:
-      self.assertTrue(urlEncode.isBaidu(url))
-    for url in falseUrls:
-      self.assertFalse(urlEncode.isBaidu(url))
+  #   trueUrls = ['http://www.baidu.com/s?wd=mao+is+cool&rsv_bp='
+  #           '0&ch=&tn=baidu&bar=&rsv_spt=3&ie=utf-8',
+  #           'http://www.baidu.com/s?wd=freedom+is+nice'
+  #           '&rsv_bp=0&rsv_spt=3&ie=utf-8']
+  #   falseUrls = ['http://www.google.com', 'stirngy']
+  #   for url in trueUrls:
+  #     self.assertTrue(urlEncode.isBaidu(url))
+  #   for url in falseUrls:
+  #     self.assertFalse(urlEncode.isBaidu(url))
 
-  def test_decodeAsBaidu(self):
-    """
-    Verify that we correctly decode Baidu urls
+  # def test_decodeAsBaidu(self):
+  #   """
+  #   Verify that we correctly decode Baidu urls
 
-    Note: we are just testing that we can decode what we encode. We
-    are relying on the test_encodeAsBaidu functionality to make sure
-    that the encoding correctly hides the data
+  #   Note: we are just testing that we can decode what we encode. We
+  #   are relying on the test_encodeAsBaidu functionality to make sure
+  #   that the encoding correctly hides the data
 
-    Dependencies: this function depends on encodeAsBaidu and decodeAsCookie
+  #   Dependencies: this function depends on encodeAsBaidu and decodeAsCookie
 
-    """
-    testData = ['this is a string', 'some-data-that-appears-mildly'
-                '-long-and-hopefully-_exceeds40chars',
-                'another string']
-    for datum in testData:
-      testOutput = urlEncode.encodeAsBaidu(datum)
-      cookieData = []
-      for cookie in testOutput['cookie']:
-        cookieData.append(urlEncode.decodeAsCookie(cookie))
-      cookieData = ''.join(cookieData)
-      urlData = urlEncode.decodeAsBaidu(testOutput['url'])
-      self.assertEqual(datum, urlData + cookieData)
+  #   """
+  #   testData = ['this is a string', 'some-data-that-appears-mildly'
+  #               '-long-and-hopefully-_exceeds40chars',
+  #               'another string']
+  #   for datum in testData:
+  #     testOutput = urlEncode.encodeAsBaidu(datum)
+  #     cookieData = []
+  #     for cookie in testOutput['cookie']:
+  #       cookieData.append(urlEncode.decodeAsCookie(cookie))
+  #     cookieData = ''.join(cookieData)
+  #     urlData = urlEncode.decodeAsBaidu(testOutput['url'])
+  #     self.assertEqual(datum, urlData + cookieData)
 
-  def test_encodeAsBaidu(self):
-    """
-    Verify that the Baidu encoding actually looks like it should
+  # def test_encodeAsBaidu(self):
+  #   """
+  #   Verify that the Baidu encoding actually looks like it should
 
-    Dependencies: decodeAsEnglish, decodeAsCookie
+  #   Dependencies: decodeAsEnglish, decodeAsCookie
 
-    """
-    testData = ['this is a string', 'some-data-that-appears-mildly'
-                '-long-and-hopefully-_exceeds40chars',
-                'another string']
-    for datum in testData:
-      testOutput = urlEncode.encodeAsBaidu(datum)
-      #assert that cookies were created if needed
-      if len(datum) > 40:
-        self.assertNotEqual(testOutput['cookie'], [])
-      #assert that the url is in the correct form
-      pattern = 'http://www.baidu.com/s\?wd=(?P<data>[\S+]+)'
-      matches = re.match(pattern, testOutput['url'])
-      self.assertIsNotNone(matches)
-      #assert that the url and cookies correctly decode
-      words = matches.group('data')
-      words = words.split('+')
-      decoded = urlEncode.decodeAsEnglish(words)
-      for cookie in testOutput['cookie']:
-        decoded += urlEncode.decodeAsCookie(cookie)
-      self.assertEqual(datum, decoded)
+  #   """
+  #   testData = ['this is a string', 'some-data-that-appears-mildly'
+  #               '-long-and-hopefully-_exceeds40chars',
+  #               'another string']
+  #   for datum in testData:
+  #     testOutput = urlEncode.encodeAsBaidu(datum)
+  #     #assert that cookies were created if needed
+  #     if len(datum) > 40:
+  #       self.assertNotEqual(testOutput['cookie'], [])
+  #     #assert that the url is in the correct form
+  #     pattern = 'http://www.baidu.com/s\?wd=(?P<data>[\S+]+)'
+  #     matches = re.match(pattern, testOutput['url'])
+  #     self.assertIsNotNone(matches)
+  #     #assert that the url and cookies correctly decode
+  #     words = matches.group('data')
+  #     words = words.split('+')
+  #     decoded = urlEncode.decodeAsEnglish(words)
+  #     for cookie in testOutput['cookie']:
+  #       decoded += urlEncode.decodeAsCookie(cookie)
+  #     self.assertEqual(datum, decoded)
 
   def test_encodeAsEnglish(self):
     """Verify that we are correctly encoding text as english"""
@@ -269,7 +276,9 @@ class TestUrlEncode(unittest.TestCase):
       #verify that test decodes correctly
       testString = []
       for word in testOutput:
-        testString.append(urlEncode.REVERSE_LOOKUP_TABLE[word])
+        character = hex(urlEncode.REVERSE_LOOKUP_TABLE[word])
+        character = character[-1]
+        testString.append(character)
       testString = ''.join(testString)
       self.assertEqual(datum, binascii.unhexlify(testString))
 
@@ -282,19 +291,64 @@ class TestUrlEncode(unittest.TestCase):
       testOutput = urlEncode.encodeAsEnglish(datum)
       self.assertEqual(datum, urlEncode.decodeAsEnglish(testOutput))
 
-  def test_isGoogle(self):
-    """Verify that urls are correctly identified as Google url"""
+  # def test_isGoogle(self):
+  #   """Verify that urls are correctly identified as Google url"""
 
-    trueData = ['http://www.google.com/search?q=this+is+a+test',
-                'http://www.google.com/search?q=a+the+adsfasd']
-    falseData = ['http://www.baidu.com/search?q=this+is+a+test',
-                 'http://www.google.com/search?q=%09808']
-    for datum in trueData:
-      self.assertTrue(urlEncode.isGoogle(datum))
-    for datum in falseData:
-      self.assertFalse(urlEncode.isGoogle(datum))
+  #   trueData = ['http://www.google.com/search?q=this+is+a+test',
+  #               'http://www.google.com/search?q=a+the+adsfasd']
+  #   falseData = ['http://www.baidu.com/search?q=this+is+a+test',
+  #                'http://www.google.com/search?q=%09808']
+  #   for datum in trueData:
+  #     self.assertTrue(urlEncode.isGoogle(datum))
+  #   for datum in falseData:
+  #     self.assertFalse(urlEncode.isGoogle(datum))
 
-  def test_decodeAsGoogle(self):
+  # def test_decodeAsGoogle(self):
+  #   """Verify that encoded text can be decoded again
+    
+  #   Dependencies: encodeAsGoogle
+
+  #   """
+  #   testData = ['some text', 'another test', 'still more text',
+  #               'an example that is liable to introduce cookies'
+  #               '- scrumptous, scrumptous cookies']
+  #   for datum in testData:
+  #     testOutput = urlEncode.encodeAsGoogle(datum)
+  #   cookieData = []
+  #   for cookie in testOutput['cookie']:
+  #     cookieData.append(urlEncode.decodeAsCookie(cookie))
+  #   cookieData = ''.join(cookieData)
+  #   urlData = urlEncode.decodeAsGoogle(testOutput['url'])
+  #   self.assertEqual(datum, urlData + cookieData)
+
+  # def test_encodeAsGoogle(self):
+  #   """Verify that data can be properly hidden as a google search
+  #   string
+
+  #   Dependencies: decodeAsEnglish, decodeAsCookie
+    
+  #   """
+  #   testData = ['some text', 'another test', 'still more text',
+  #               'an example that is liable to introduce cookies'
+  #               '- scrumptous, scrumptous cookies']
+  #   for datum in testData:
+  #     testOutput = urlEncode.encodeAsGoogle(datum)
+  #     #assert that cookies were created if needed
+  #     if len(datum) > 40:
+  #       self.assertNotEqual(testOutput['cookie'], [])
+  #     #assert that the url is in the correct form
+  #     pattern = 'http://www.google.com/search\?q=(?P<data>[a-zA-Z+]+)'
+  #     matches = re.match(pattern, testOutput['url'])
+  #     self.assertIsNotNone(matches)
+  #     #assert that the url and cookies correctly decode
+  #     words = matches.group('data')
+  #     words = words.split('+')
+  #     decoded = urlEncode.decodeAsEnglish(words)
+  #     for cookie in testOutput['cookie']:
+  #       decoded += urlEncode.decodeAsCookie(cookie)
+  #     self.assertEqual(datum, decoded)
+
+  def test_decodeWithB64(self):
     """Verify that encoded text can be decoded again
     
     Dependencies: encodeAsGoogle
@@ -304,15 +358,15 @@ class TestUrlEncode(unittest.TestCase):
                 'an example that is liable to introduce cookies'
                 '- scrumptous, scrumptous cookies']
     for datum in testData:
-      testOutput = urlEncode.encodeAsGoogle(datum)
+      testOutput = urlEncode.encodeAsB64(datum)
     cookieData = []
     for cookie in testOutput['cookie']:
-      cookieData.append(urlEncode.decodeAsCookie(cookie))
+      cookieData.append(urlEncode.decodeAsCookie(cookie['key'], cookie['value']))
     cookieData = ''.join(cookieData)
-    urlData = urlEncode.decodeAsGoogle(testOutput['url'])
+    urlData = urlEncode.decodeWithB64(testOutput['url'])
     self.assertEqual(datum, urlData + cookieData)
 
-  def test_encodeAsGoogle(self):
+  def test_encodeAsB64(self):
     """Verify that data can be properly hidden as a google search
     string
 
@@ -323,21 +377,75 @@ class TestUrlEncode(unittest.TestCase):
                 'an example that is liable to introduce cookies'
                 '- scrumptous, scrumptous cookies']
     for datum in testData:
-      testOutput = urlEncode.encodeAsGoogle(datum)
+      testOutput = urlEncode.encodeAsB64(datum)
       #assert that cookies were created if needed
       if len(datum) > 40:
         self.assertNotEqual(testOutput['cookie'], [])
       #assert that the url is in the correct form
-      pattern = 'http://www.google.com/search\?q=(?P<data>[a-zA-Z+]+)'
+      pattern = 'http://[0-9A-Za-z:.]/(?P<path>[\S]+)\?(?P<query>[\S]+)'
       matches = re.match(pattern, testOutput['url'])
       self.assertIsNotNone(matches)
       #assert that the url and cookies correctly decode
-      words = matches.group('data')
-      words = words.split('+')
-      decoded = urlEncode.decodeAsEnglish(words)
+      decoded = urlEncode.decodeWithB64(testOutput['url'])
       for cookie in testOutput['cookie']:
         decoded += urlEncode.decodeAsCookie(cookie)
       self.assertEqual(datum, decoded)
+
+  def test_encodeWithDict(self):
+    """Verify that we can encode data using the dictionary"""
+    # we will have two words ['e' <<8 | 'h'] and ['l' <8 | 'l'], then
+    # [255 << 8 | 'o'] for the second one
+    testData = ["hell", 'hello']
+    # 25960 and 27756, then add 65391 for second
+    testOutput = [['by\'s', 'cesarian'],
+                  ['by\'s', 'cesarian', 'objections'],]
+    for index in range(len(testData)):
+      datum = testData[index]
+      comparison = testOutput[index]
+      output = urlEncode.encodeWithDict(datum)
+      self.assertEqual(output, comparison)
+
+  def test_decodeWithDict(self):
+    """Verify that we can decode data from the dictionary"""
+    # testData = "Adderley's+Adar's+Adela+Adela"
+    testData = [['by\'s', 'cesarian'], 
+                ['by\'s', 'cesarian', 'objections'],]
+    testOutput = ["hell", 'hello']
+    for index in range(len(testData)):
+      datum = testData[index]
+      comparison = testOutput[index]
+      output = ''.join(urlEncode.decodeWithDict(datum))
+      self.assertEqual(output,comparison)
+
+  def test_encodeAsOpenSearch(self):
+    pass
+
+  def test_decodeAsOpenSearch(self):
+    pass
+
+  def test_isOpenSearch(self):
+    pass
+
+  def test_convertCookieInputToOutput(self):
+    # verify that all of the cookies are added and that the keys and
+    # values are the same
+    testData = ['by jove, this string seems like it may continue for'
+               'eternity, possibly to the end of time',
+               'this is a shorter message, but still longish',
+               'some messages are not too long',
+               'some messages can become very verbose and by the intrinsic'
+               'nature of their character, they are forced to become'
+               'eloquent prose which drags on for lines and lines',
+               'Remember, remember, the 5th of November, the gunpowder'
+               'treason and plot. I can think of no reason why the 5th of'
+               'november should ever be forgot']
+    for datum in testData:
+      cookies = urlEncode.encodeAsCookies(datum)
+      testOutput = urlEncode.convertCookieInputToOutput(cookies)
+      # assert that all of the keys are present
+      for cookie in cookies:
+        self.assertIn(cookie['key'], testOutput)
+        self.assertEqual(cookie['value'], testOutput[cookie['key']])
 
 if __name__ == '__main__':
   unittest.main()
