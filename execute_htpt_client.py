@@ -88,10 +88,10 @@ def main():
     router = Router('192.168.1.1', 'root', 'passw0rd')
     server = Router('192.168.20.1', 'gtnoise', 'gtnoise')
 
-    for NET_DEL in [1,10,20,30,40,50,100,500]: #150,200,300,400,500,1000]
+    for NET_DEL in [0,10,40,100,500]: #150,200,300,400,500,1000]
         set_network_delay(router, NET_DEL)
-        for REQ_DEL in [0,1,10,50,100,500,1000]:
-            for SIZE in [100, 200, 500, 1000, 1400, 2000]:
+        for REQ_DEL in [0,10,40,100,500]:
+            for SIZE in [50, 100, 200, 500]:
                 set_const(REQ_DEL, SIZE)
 
                 filename = str(NET_DEL)+'_'+str(REQ_DEL)+'_'+str(SIZE)+'.log'
