@@ -96,7 +96,7 @@ def main():
 
                 filename = str(NET_DEL)+'_'+str(REQ_DEL)+'_'+str(SIZE)+'.log'
 
-                server.remoteCommand('kill -9 $(pgrep htpt); ./htpt/htpt/htpt.py -server > /home/gtnoise/Documents/server_'+filename)
+                server.remoteCommand('kill -9 $(pgrep htpt);./htpt/htpt/htpt.py -server')
 
                 time.sleep(1)
 
