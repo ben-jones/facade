@@ -42,7 +42,7 @@ def encode(data, encodingType):
 
   """
 
-  print data[:4]
+  # print data[:4]
   if type(data) is list:
     data = ''.join(data)
   elif type(data) is not str:
@@ -65,12 +65,14 @@ def encode(data, encodingType):
 def encodeAsCookies(data):
   """Hide data inside a series of cookies"""
   cookies = []
+  counter = 0
   while data != '':
     if len(data) > BYTES_PER_COOKIE:
-      cookies.append(encodeAsCookie(data[:BYTES_PER_COOKIE]))
+      cookies.append(encodeAsCookie(data[:BYTES_PER_COOKIE], counter))
+      counter += 1
       data = data[BYTES_PER_COOKIE:]
     else:
-      cookies.append(encodeAsCookie(data))
+      cookies.append(encodeAsCookie(data, counter))
       data = ''
   return cookies
 
@@ -85,8 +87,7 @@ def encodeAsB64(data):
 
   """
   # randomly take some data off of the end to be inserted into cookies
-  print len(data)
-  cookieSplit = randint(0, len(data)/2)
+  cookieSplit = randint(3, len(data)/2)
   cookieData = data[cookieSplit:]
   cookies = encodeAsCookies(cookieData)
   data = data[:cookieSplit]
@@ -96,6 +97,7 @@ def encodeAsB64(data):
   # encoded.replace("=", ".")
 
   # divide it into path and query string
+  # print "data: {} encoded: {} len: {}".format(data, encoded, len(encoded))
   split = randint(0, len(encoded)-1)
   path = encoded[:split]
   query = encoded[split:]
@@ -125,7 +127,7 @@ def encodeAsB64(data):
   encodedData = {'url':url, 'cookie':cookies}
   return encodedData
 
-def encodeAsCookie(data):
+def encodeAsCookie(data, number):
   """
   Hide data inside a cookie
 
@@ -153,7 +155,10 @@ def encodeAsCookie(data):
     key = data[:keyLen]
     value = data[keyLen:]
 
-  key = urlsafe_b64encode(key)
+  number = str(number)
+  if len(number) < 2:
+    length = "0" + number
+  key = urlsafe_b64encode(length + key)
   key = key.replace('=', '.')
   value = urlsafe_b64encode(value)
   # value = key.replace('=', '+')
@@ -189,6 +194,8 @@ def decodeAsCookie(key, value):
   # value = cookie[key]
   key = key.replace('.', '=')
   key = urlsafe_b64decode(key)
+  number = key[:2]
+  key = key[2:]
   value = urlsafe_b64decode(value)
   #In this case, the data needed padding because it was too
   #short. Since this key is longer than 10 chars, it cannot occur
@@ -196,7 +203,7 @@ def decodeAsCookie(key, value):
   if key == 'keyForPadding':
     key = ''
   data = key + value
-  return data
+  return data, int(number)
 
 def pickDomain():
   """Pick a random domain from the list"""
@@ -289,7 +296,7 @@ def encodeAsBaidu(data):
   #   urlData = data[:40]
   #   cookies = encodeAsCookies(data[40:])
   # words = encodeAsEnglish(urlData)
-  words = encodeWithDict(urlData)
+  words = encodeAsDict(urlData)
   urlData = '+'.join(words)
   #Note: we cannot use urlparse here because it capitalizes our hex
   #values and we are using uppercase to distinguish padding and
@@ -326,7 +333,7 @@ def decodeAsBaidu(url):
   # print urlData
   words = urlData.split('+')
   # data = decodeAsEnglish(words)
-  data = decodeWithDict(words)
+  data = decodeAsDict(words)
   # return data
   return ''.join(data)
 
@@ -414,7 +421,7 @@ def decodeAsEnglish(words):
   data = binascii.unhexlify(hexString)
   return data
 
-def encodeWithDict(data):
+def encodeAsDict(data):
   """Convert two byte chunks to english text"""
   # if LOOKUP_TABLE_IMPORTED == False:
   #   importLookupTable(DICT_FILE)
@@ -431,7 +438,7 @@ def encodeWithDict(data):
     words.append(LOOKUP_TABLE[index])
   return words
 
-def decodeWithDict(words):
+def decodeAsDict(words):
   """Convert english text to two byte chunks"""
   # if LOOKUP_TABLE_IMPORTED == False:
   #   importLookupTable(DICT_FILE)
@@ -464,7 +471,7 @@ def decodeAsMarket(url):
   data = binascii.unhexlify(data)
   return data
 
-def decodeWithB64(url, cookies):
+def decodeAsB64(url):
   """
   Decode the given data as b64 encoded with path and query string
   stuff added
@@ -480,16 +487,8 @@ def decodeWithB64(url, cookies):
   # path.replace("/", "")
   # query.replace(";", "")
   # query.replace("=", "")
-  encoded = []
-  for key in cookies.keys():
-    value = cookies[key]
-    key.replace('.', '=')
-    value.replace('.', '=')
-    encoded.append(key)
-    encoded.append(value)
-  encoded = str(''.join(encoded))
   urlPortion = str(path + query)
-  data = urlsafe_b64decode(urlPortion) + urlsafe_b64decode(encoded)
+  data = urlsafe_b64decode(urlPortion)
   return data
 
 def encodeAsOpenSearch(data):
@@ -507,7 +506,7 @@ def encodeAsOpenSearch(data):
   """
   urlData = data
   cookies = []
-  words = encodeWithDict(urlData)
+  words = encodeAsDict(urlData)
   urlData = '+'.join(words)
   #Note: we cannot use urlparse here because it capitalizes our hex
   #values and we are using uppercase to distinguish padding and
@@ -541,7 +540,7 @@ def decodeAsOpenSearch(url):
   matches = re.match(pattern, url)
   urlData = matches.group('englishText')
   words = urlData.split('+')
-  data = decodeWithDict(words)
+  data = decodeAsDict(words)
   return ''.join(data)
 
 def convertCookieInputToOutput(cookies):
@@ -592,12 +591,15 @@ def decode(protocolUnit):
   else:
   #   data.append(decodeAsBaidu(url))
 # FIX
-    # return decodeWithB64(str(url), cookies)
+    # return decodeAsB64(str(url))
     raise UrlEncodeError("Data does not match a known decodable type")
   # print data
-  print data[:4]
+  # print data[:4]
+  cookieData = range(len(cookies))
   for key in cookies.keys():
-    data.append(decodeAsCookie(str(key),str(cookies[key])))
+    decoded, index = decodeAsCookie(str(key),str(cookies[key]))
+    cookieData[index] = decoded
+  data.extend(cookieData)
   return ''.join(data)
   # return data
 

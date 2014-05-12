@@ -51,10 +51,11 @@ class TestUrlEncode(unittest.TestCase):
                'november should ever be forgot']
     for datum in testData:
       testOutput = urlEncode.encodeAsCookies(datum)
-      data = []
+      data = range(len(testOutput))
       testOutput = urlEncode.convertCookieInputToOutput(testOutput)
       for key in testOutput.keys():
-        data.append(urlEncode.decodeAsCookie(str(key), str(testOutput[key])))
+        decoded, index = urlEncode.decodeAsCookie(str(key), str(testOutput[key]))
+        data[index] = decoded
       data = ''.join(data)
       self.assertEqual(data, datum)
 
@@ -64,16 +65,19 @@ class TestUrlEncode(unittest.TestCase):
                 'a little more text wont hurt',
                 'that may have been too much']
     for datum in testData:
-      testOutput = urlEncode.encodeAsCookie(datum)
+      testOutput = urlEncode.encodeAsCookie(datum, 7)
       #verify that the cookie matches the original datum
       key = testOutput['key']
       key = key.replace('.', '=')
       value = testOutput['value']
       key = urlsafe_b64decode(key)
+      index = int(key[:2])
+      key = key[2:]
       if key == 'keyForPadding':
         key = ''
       value = urlsafe_b64decode(value)
       self.assertEqual(key + value, datum)
+      self.assertEqual(index, 7)
 
   def test_decodeAsCookie(self):
     """Test that cookies can be correctly decoded"""
@@ -84,19 +88,23 @@ class TestUrlEncode(unittest.TestCase):
         keyLen = 3
       elif len(datum) <= 5:
         key = 'keyForPadding' #longer than 10 chars, so no need to escape
-        key = urlsafe_b64encode(key)
-        key = key.replace('=', '+')
+        key = urlsafe_b64encode("01" +key)
+        key = key.replace('=', '.')
         value = urlsafe_b64encode(datum)
-        self.assertEqual(urlEncode.decodeAsCookie(key, value), datum)
-        break
+        decoded, index = urlEncode.decodeAsCookie(key, value)
+        self.assertEqual(decoded, datum)
+        self.assertEqual(index, 1)
+        continue
       else:
         keyLen = randint(3, 10)
       key = datum[:keyLen]
       value = datum[keyLen:]
-      key = urlsafe_b64encode(key)
+      key = urlsafe_b64encode("05" +key)
       key = key.replace('=', '.')
       value = urlsafe_b64encode(value)
-      self.assertEqual(urlEncode.decodeAsCookie(key, value), datum)
+      decoded, index = urlEncode.decodeAsCookie(key, value)
+      self.assertEqual(decoded, datum)
+      self.assertEqual(index, 5)
 
   def test_pickDomain(self):
     """Test that a domain is correctly returned"""
@@ -138,8 +146,11 @@ class TestUrlEncode(unittest.TestCase):
         testDatum = hashPart[2:dataLen+2]
         testDatum = binascii.unhexlify(testDatum)
         cookies = urlEncode.convertCookieInputToOutput(output['cookie'])
+        cookieData = range(len(cookies))
         for key in cookies.keys():
-          testDatum += urlEncode.decodeAsCookie(str(key), str(cookies[key]))
+          decoded, index = urlEncode.decodeAsCookie(str(key), str(cookies[key]))
+          cookieData[index] = decoded
+        testDatum += ''.join(cookieData)
         self.assertEqual(testDatum, datum)
 
   def test_isMarket(self):
@@ -367,9 +378,10 @@ class TestUrlEncode(unittest.TestCase):
                 '- scrumptous, scrumptous cookies']
     for datum in testData:
       testOutput = urlEncode.encodeAsB64(datum)
-    cookieData = []
+    cookieData = range(len(testOutput['cookie']))
     for cookie in testOutput['cookie']:
-      cookieData.append(urlEncode.decodeAsCookie(cookie['key'], cookie['value']))
+      cookieOut, index = urlEncode.decodeAsCookie(cookie['key'], cookie['value']) 
+      cookieData[index] = cookieOut
     cookieData = ''.join(cookieData)
     urlData = urlEncode.decodeAsB64(testOutput['url'])
     self.assertEqual(datum, urlData + cookieData)
@@ -401,8 +413,11 @@ class TestUrlEncode(unittest.TestCase):
       query.replace(".", "=")
       decoded = urlsafe_b64decode(path + query)
       cookies = urlEncode.convertCookieInputToOutput(testOutput['cookie'])
+      cookieData = range(len(cookies))
       for key in cookies.keys():
-        decoded += urlEncode.decodeAsCookie(str(key), str(cookies[key]))
+        cookieDecoded, index = urlEncode.decodeAsCookie(str(key), str(cookies[key]))
+        cookieData[index] = cookieDecoded
+      decoded += ''.join(cookieData)
       self.assertEqual(datum, decoded)
 
   def test_encodeAsDict(self):
