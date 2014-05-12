@@ -15,6 +15,8 @@ class TestUrlEncode(unittest.TestCase):
 
   def setUp(self):
     urlEncode.domain = 'localhost:11000'
+    urlEncode.LOOKUP_TABLE = urlEncode.importLookupTable(urlEncode.DICT_FILE)
+    urlEncode.REVERSE_LOOKUP_TABLE = urlEncode.importReverseLookupTable(urlEncode.DICT_FILE)
 
   def test_encode(self):
     """Verify that the encode method works correctly"""
@@ -63,15 +65,10 @@ class TestUrlEncode(unittest.TestCase):
                 'that may have been too much']
     for datum in testData:
       testOutput = urlEncode.encodeAsCookie(datum)
-      #verify that the cookie matches our regular expression
-      pattern = 'Cookie: (?P<key>[a-zA-Z0-9+_\-/]+)=' \
-                '(?P<value>[a-zA-Z0-9+_=\-/]*)'
-      match = re.search(pattern, testOutput)
-      self.assertIsNotNone(match)
       #verify that the cookie matches the original datum
-      key = match.group('key')
-      key = key.replace('+', '=')
-      value = match.group('value')
+      key = testOutput['key']
+      key = key.replace('.', '=')
+      value = testOutput['value']
       key = urlsafe_b64decode(key)
       if key == 'keyForPadding':
         key = ''
@@ -90,18 +87,16 @@ class TestUrlEncode(unittest.TestCase):
         key = urlsafe_b64encode(key)
         key = key.replace('=', '+')
         value = urlsafe_b64encode(datum)
-        cookie = 'Cookie: ' + key + '=' + value
-        self.assertEqual(urlEncode.decodeAsCookie(cookie), datum)
+        self.assertEqual(urlEncode.decodeAsCookie(key, value), datum)
         break
       else:
         keyLen = randint(3, 10)
       key = datum[:keyLen]
       value = datum[keyLen:]
       key = urlsafe_b64encode(key)
-      key = key.replace('=', '+')
+      key = key.replace('=', '.')
       value = urlsafe_b64encode(value)
-      cookie = 'Cookie: ' + key + '=' + value
-      self.assertEqual(urlEncode.decodeAsCookie(cookie), datum)
+      self.assertEqual(urlEncode.decodeAsCookie(key, value), datum)
 
   def test_pickDomain(self):
     """Test that a domain is correctly returned"""
@@ -266,6 +261,13 @@ class TestUrlEncode(unittest.TestCase):
   def test_encodeAsEnglish(self):
     """Verify that we are correctly encoding text as english"""
 
+    urlEncode.LOOKUP_TABLE = ['a', 'an', 'ha', 'hi', 'if', 'ai', 'he',
+                  'BB', 'it', 'cd', 'co', 'as', 'is', 'am', 'DA', 'EE']
+    urlEncode.REVERSE_LOOKUP_TABLE = {'a':'0', 'an':'1', 'ha':'2',
+                  'hi':'3', 'if':'4', 'ai':'5', 'he':'6',
+                  'BB':'7', 'it':'8', 'cd':'9', 'co':'A',
+                  'as':'B', 'is':'C', 'am':'D', 'DA':'E',
+                  'EE':'F'}
     testData = ['some text', 'more texty things',
                 'but wait, there is even more and you even get a :']
     for datum in testData:
@@ -276,8 +278,7 @@ class TestUrlEncode(unittest.TestCase):
       #verify that test decodes correctly
       testString = []
       for word in testOutput:
-        character = hex(urlEncode.REVERSE_LOOKUP_TABLE[word])
-        character = character[-1]
+        character = urlEncode.REVERSE_LOOKUP_TABLE[word]
         testString.append(character)
       testString = ''.join(testString)
       self.assertEqual(datum, binascii.unhexlify(testString))
@@ -285,12 +286,19 @@ class TestUrlEncode(unittest.TestCase):
   def test_decodeAsEnglish(self):
     """Verify that we can correctly decode the hidden data"""
 
+    urlEncode.LOOKUP_TABLE = ['a', 'an', 'ha', 'hi', 'if', 'ai', 'he',
+                  'BB', 'it', 'cd', 'co', 'as', 'is', 'am', 'DA', 'EE']
+    urlEncode.REVERSE_LOOKUP_TABLE = {'a':'0', 'an':'1', 'ha':'2',
+                  'hi':'3', 'if':'4', 'ai':'5', 'he':'6',
+                  'BB':'7', 'it':'8', 'cd':'9', 'co':'A',
+                  'as':'B', 'is':'C', 'am':'D', 'DA':'E',
+                  'EE':'F'}
+
     testData = ['somethinga45lkh;asf wonddeasdful', 'other',
                 'stuffy awesomeness']
     for datum in testData:
       testOutput = urlEncode.encodeAsEnglish(datum)
       self.assertEqual(datum, urlEncode.decodeAsEnglish(testOutput))
-
   # def test_isGoogle(self):
   #   """Verify that urls are correctly identified as Google url"""
 
@@ -348,7 +356,7 @@ class TestUrlEncode(unittest.TestCase):
   #       decoded += urlEncode.decodeAsCookie(cookie)
   #     self.assertEqual(datum, decoded)
 
-  def test_decodeWithB64(self):
+  def test_decodeAsB64(self):
     """Verify that encoded text can be decoded again
     
     Dependencies: encodeAsGoogle
@@ -363,14 +371,13 @@ class TestUrlEncode(unittest.TestCase):
     for cookie in testOutput['cookie']:
       cookieData.append(urlEncode.decodeAsCookie(cookie['key'], cookie['value']))
     cookieData = ''.join(cookieData)
-    urlData = urlEncode.decodeWithB64(testOutput['url'])
+    urlData = urlEncode.decodeAsB64(testOutput['url'])
     self.assertEqual(datum, urlData + cookieData)
 
   def test_encodeAsB64(self):
-    """Verify that data can be properly hidden as a google search
-    string
+    """Verify that data can be hidden with base 64
 
-    Dependencies: decodeAsEnglish, decodeAsCookie
+    Dependencies: decodeAsCookie
     
     """
     testData = ['some text', 'another test', 'still more text',
@@ -382,16 +389,23 @@ class TestUrlEncode(unittest.TestCase):
       if len(datum) > 40:
         self.assertNotEqual(testOutput['cookie'], [])
       #assert that the url is in the correct form
-      pattern = 'http://[0-9A-Za-z:.]/(?P<path>[\S]+)\?(?P<query>[\S]+)'
+      pattern = 'http://[0-9A-Za-z:.]+/(?P<path>[\S]*)\?(?P<query>[\S]*)'
       matches = re.match(pattern, testOutput['url'])
       self.assertIsNotNone(matches)
       #assert that the url and cookies correctly decode
-      decoded = urlEncode.decodeWithB64(testOutput['url'])
-      for cookie in testOutput['cookie']:
-        decoded += urlEncode.decodeAsCookie(cookie)
+      path = matches.group('path')
+      query = matches.group('query')
+      path.replace("=", "")
+      path.replace(".", "=")
+      query.replace("=", "")
+      query.replace(".", "=")
+      decoded = urlsafe_b64decode(path + query)
+      cookies = urlEncode.convertCookieInputToOutput(testOutput['cookie'])
+      for key in cookies.keys():
+        decoded += urlEncode.decodeAsCookie(str(key), str(cookies[key]))
       self.assertEqual(datum, decoded)
 
-  def test_encodeWithDict(self):
+  def test_encodeAsDict(self):
     """Verify that we can encode data using the dictionary"""
     # we will have two words ['e' <<8 | 'h'] and ['l' <8 | 'l'], then
     # [255 << 8 | 'o'] for the second one
@@ -402,10 +416,10 @@ class TestUrlEncode(unittest.TestCase):
     for index in range(len(testData)):
       datum = testData[index]
       comparison = testOutput[index]
-      output = urlEncode.encodeWithDict(datum)
+      output = urlEncode.encodeAsDict(datum)
       self.assertEqual(output, comparison)
 
-  def test_decodeWithDict(self):
+  def test_decodeAsDict(self):
     """Verify that we can decode data from the dictionary"""
     # testData = "Adderley's+Adar's+Adela+Adela"
     testData = [['by\'s', 'cesarian'], 
@@ -414,11 +428,25 @@ class TestUrlEncode(unittest.TestCase):
     for index in range(len(testData)):
       datum = testData[index]
       comparison = testOutput[index]
-      output = ''.join(urlEncode.decodeWithDict(datum))
+      output = ''.join(urlEncode.decodeAsDict(datum))
       self.assertEqual(output,comparison)
 
   def test_encodeAsOpenSearch(self):
-    pass
+    testData = ['some text', 'more text',
+                'even more text that seems moderately longish']
+    for datum in testData:
+        output = urlEncode.encodeAsOpenSearch(datum)
+        testOutput = output['url']
+        #verify that the output is in the correct form
+        pattern = 'http://[a-zA-Z0-9.:]+/s\?wd=(?P<searchQuery>[0-9a-zA-Z+\'%]*)'
+        matches = re.match(pattern, testOutput)
+        self.assertNotEqual(matches, None)
+        words = matches.group('searchQuery').split('+')
+        testDatum = urlEncode.decodeAsDict(words)
+        cookies = urlEncode.convertCookieInputToOutput(output['cookie'])
+        for key in cookies.keys():
+          testDatum += urlEncode.decodeAsCookie(str(key), str(cookies[key]))
+        self.assertEqual(''.join(testDatum), datum)
 
   def test_decodeAsOpenSearch(self):
     pass
