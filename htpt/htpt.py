@@ -106,15 +106,18 @@ class HTPT():
         os.remove(IMAGE_FILE)
       except OSError as e:
         pass
-#      print "numCookies: {} length: {}".format(len(encoded['cookie']),len(encoded['url']))
-      self.driver.get(encoded['url'])
-      while not os.path.exists(IMAGE_FILE):
+      # print "numCookies: {} length: {}".format(len(encoded['cookie']),len(encoded['url']))
+      for url in encoded['url']:
+        self.driver.get(url)
+        while not os.path.exists(IMAGE_FILE):
+          time.sleep(0.001)
+        # WebDriverWait(self.driver, 10).until(EC.visibility_of("img"))
         time.sleep(0.001)
-      # WebDriverWait(self.driver, 10).until(EC.visibility_of("img"))
-      time.sleep(0.001)
-      fileP = open(IMAGE_FILE, 'r')
-      readData = fileP.read()
-      fileP.close()
+        with open(IMAGE_FILE, 'r') as f:
+        readData = f.read()
+        decoded = imageEncode.decode(readData, 'png')
+        self.disassembler.disassemble(decoded)
+        time.sleep(TIMEOUT)
       # readData = self.driver.page_source
       # reader = urllib2.urlopen(request)
       # readData = reader.read()
@@ -122,9 +125,6 @@ class HTPT():
       self.driver.delete_all_cookies()
       # self.driver.quit()
       # self.driver.close()
-      decoded = imageEncode.decode(readData, 'png')
-      self.disassembler.disassemble(decoded)
-      time.sleep(TIMEOUT)
 
   def bridgeConnect(self, address, password):
     """

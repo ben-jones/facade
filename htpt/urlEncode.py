@@ -2,10 +2,12 @@
 # Georgia Tech Fall 2013
 # url-encode.py: collection of functions to hide small chunks of data in urls
 
-import binascii
-import re
 from base64 import urlsafe_b64encode, urlsafe_b64decode
+import binascii
+import numpy as np
 from random import choice, randint
+import re
+from scipy.stats import entropy
 
 AVAILABLE_TYPES=['market', 'baidu', 'google', 'b64', 'search']
 BYTES_PER_COOKIE=30
@@ -17,7 +19,7 @@ REVERSE_LOOKUP_TABLE = {'a':'0', 'an':'1', 'ha':'2', 'hi':'3',
                         'it':'8', 'cd':'9', 'co':'A', 'as':'B',
                         'is':'C', 'am':'D', 'DA':'E', 'EE':'F'}
 DICT_FILE = "dictionary.txt"
-
+TARGET_ENTROPY = 40
 
 class UrlEncodeError(Exception):
   pass
@@ -503,17 +505,27 @@ def encodeAsOpenSearch(data):
 
   Example: http://www.baidu.com/s?wd=mao+is+cool&rsv_bp=0&ch=&tn=baidu&bar=&rsv_spt=3&ie=utf-8
 
+  Note: we only encode data up to the target entropy
+
   """
   urlData = data
-  cookies = []
-  words = encodeAsDict(urlData)
-  urlData = '+'.join(words)
-  #Note: we cannot use urlparse here because it capitalizes our hex
-  #values and we are using uppercase to distinguish padding and
-  #actual text
-  # url = 'http://www.baidu.com/s?wd=' + urlData
-  url = 'http://' +domain + '/s?wd=' + urlData
-  encodedData = {'url':url, 'cookie':cookies}
+  urls = []
+  # if there are an odd number of elements, add -1 onto the end
+  if len(data) %2 != 0:
+    data.append(chr(255))
+  # encode the data two bytes at a time, check the entropy, and create
+  # a new query if we are over the limit
+  query = []
+  for chunkIndex in range(0,len(data), 2):
+    chunk = data[chunkIndex:chunkIndex+2]
+    index = (ord(chunk[1]) << 8) | ord(chunk[0])
+    query.append(LOOKUP_TABLE[index])
+    # if we exceed the target entropy, then create a new URL
+    # TODO migrate this to a exponentially weighted moving average
+    if entropy(np.bincount(map(ord, '+'.join(query)))) > TARGET_ENTROPY:
+      urls.append('http://' +domain + '/s?wd=' + '+'.join(query))
+      query = []
+  encodedData = {'urls':urls, 'cookie': []}
   return encodedData
 
 def isOpenSearch(url):
