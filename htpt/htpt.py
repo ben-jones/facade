@@ -42,14 +42,17 @@ SERVER_SOCKS_PORT=9150 # communication b/w Tor and SOCKS client
 HTPT_CLIENT_SOCKS_PORT=8002   # communication b/w htpt and SOCKS
 #HTPT_SERVER_SOCKS_PORT=8003   # communication b/w htpt and SOCKS
 TIMEOUT = 0.5 #max number of seconds between calls to read from the server
-PAYLOAD_SIZE = 180
-ENCODING_SCHEME = 'market'
-# ENCODING_SCHEME = 'search'
+PAYLOAD_SIZE = 1
+SERVER_PAYLOAD_SIZE = 500000
+# ENCODING_SCHEME = 'market'
+ENCODING_SCHEME = 'search'
+NUM_DATA_TIL_STOP = 1000000
 # ENCODING_SCHEME = 'baidu'
 # ENCODING_SCHEME = 'b64'
 if ENCODING_SCHEME == 'market':
   PAYLOAD_SIZE = 39
 LOG_FILE = "log-file.txt"
+SERVER_LOG_FILE = "server-log-file.txt"
 IMAGE_FILE = "/home/ben/Downloads/hiccup-transfer-image.png"
 #Constants just to make this work-> remove
 #TODO
@@ -75,7 +78,12 @@ class HTPT():
     self.assembler = frame.Assembler()
     # bind to a local address and wait for Tor to connect
     self.bridgeConnect(TOR_BRIDGE_ADDRESS, TOR_BRIDGE_PASSWORD)
+    currentData = 0
     while 1:
+      if currentData >= NUM_DATA_TIL_STOP:
+        break
+      else:
+        currentData += SERVER_PAYLOAD_SIZE
       segment = ''.join([random.choice(string.digits) for i in range(PAYLOAD_SIZE)])
       # segment = "hello"
       framed = self.assembler.assemble(segment)
@@ -98,7 +106,7 @@ class HTPT():
         os.remove(IMAGE_FILE)
       except OSError as e:
         pass
-      print "numCookies: {} length: {}".format(len(encoded['cookie']),len(encoded['url']))
+#      print "numCookies: {} length: {}".format(len(encoded['cookie']),len(encoded['url']))
       self.driver.get(encoded['url'])
       while not os.path.exists(IMAGE_FILE):
         time.sleep(0.001)
@@ -174,7 +182,7 @@ class HTPT():
     Returns: nothing
 
     """
-    print "htpt: {}".format(data)
+    print "htpt: {}".format(len(data))
     # self.torSock.send(data)
     return
 
@@ -231,7 +239,7 @@ def processRequest(path):
     #receive the data
     decoded = urlEncode.decode({'url':request.url, 'cookie':request.cookies})
     htptObject.disassembler.disassemble(decoded)
-    segment = ''.join([random.choice(string.digits) for i in range(PAYLOAD_SIZE)])
+    segment = ''.join([random.choice(string.digits) for i in range(SERVER_PAYLOAD_SIZE)])
     framed = htptObject.assembler.assemble(segment)
     # encode the data
     encoded = imageEncode.encode(framed, 'png')
@@ -255,7 +263,7 @@ def callback(data):
   if data == '':
     return
   else:
-   print "Received: {}".format(data)
+   print "Received: {}".format(len(data))
    htptObject.recvData(data)
   
 if __name__ == '__main__':
